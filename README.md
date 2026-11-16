@@ -36,11 +36,13 @@ CIFAR-10 is downloaded to `data/` on the first run. A GPU is used when available
 
 ### Running on Google Colab
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/nilozdemir/EE58012/blob/main/colab.ipynb)
+
 `colab.ipynb` runs every command below on a Colab GPU: it clones this repository, keeps
 `checkpoints/` and `results/` on Google Drive (`MyDrive/ee58012-ga1/`), trains the clean
 model (skipped if the checkpoint is already there) and produces every figure and table.
-Set `REPO_URL` in its first cell, choose a GPU runtime and run all cells; after a
-disconnect, run all cells again and finished steps are skipped.
+Choose a GPU runtime and run all cells; after a disconnect, run all cells again and
+finished steps are skipped.
 
 ## Commands for every figure and table
 
