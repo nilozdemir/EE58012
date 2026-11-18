@@ -3,3 +3,6 @@ checkpoints/*.pt
 __pycache__/
 *.pyc
 logs/
+report/*
+!report/report.tex
+!report/report.pdf
