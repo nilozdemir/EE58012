@@ -1,0 +1,3 @@
+mode,rho,k,method,asr,n_images,flag_mismatch,seconds
+targeted,0.25,256,gradcam,0.06348871546087323,9482,0,44.9
+targeted,0.5,512,gradcam,0.2523729171060958,9482,0,42.1
