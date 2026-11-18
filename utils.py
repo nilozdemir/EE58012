@@ -1,6 +1,7 @@
 """Logging, and saving and loading checkpoints."""
 
 import csv
+import os
 
 import torch
 
@@ -24,6 +25,12 @@ def save_log(path, rows):
         writer.writerows(rows)
 
 
+def load_rows(path):
+    """Read a log written by save_log back as the list of per-epoch dicts."""
+    with open(path, newline="") as f:
+        return [{k: float(v) for k, v in row.items()} for row in csv.DictReader(f)]
+
+
 def load_log(path):
     """Read a log written by save_log.
 
@@ -39,7 +46,7 @@ def load_log(path):
     return {key: [float(row[key]) for row in rows] for key in rows[0]}
 
 
-def save_checkpoint(path, model, optimizer, epoch):
+def save_checkpoint(path, model, optimizer, epoch, scheduler=None):
     """Save the model weights and the training state to a file.
 
     Args:
@@ -48,15 +55,19 @@ def save_checkpoint(path, model, optimizer, epoch):
         optimizer (torch.optim.Optimizer): Optimiser whose state is saved,
             needed only to resume training.
         epoch (int): Number of epochs trained so far.
+        scheduler (LRScheduler, optional): Learning-rate scheduler whose state is
+            saved, needed only to resume training.
     """
-    torch.save(
-        {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "epoch": epoch,
-        },
-        path,
-    )
+    state = {
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "epoch": epoch,
+    }
+    if scheduler is not None:
+        state["scheduler"] = scheduler.state_dict()
+    tmp = path + ".tmp"            # write then rename: a crash never leaves a broken file
+    torch.save(state, tmp)
+    os.replace(tmp, path)
 
 
 def load_checkpoint(path, model, optimizer=None, device="cpu"):

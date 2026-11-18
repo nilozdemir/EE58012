@@ -15,7 +15,7 @@ from torch.optim.lr_scheduler import (
 )
 
 from test import evaluate
-from utils import checkpoint_path, save_checkpoint, save_log
+from utils import checkpoint_path, load_rows, save_checkpoint, save_log
 
 WEIGHT_DECAY = 5e-4
 WARMUP_EPOCHS = 1
@@ -106,9 +106,12 @@ def build_scheduler(optimizer, name, total_iters, warmup_iters=0):
 
 
 def fit(model, train_loader, val_loader, test_loader, args, device):
-    """Train for args.epochs epochs, log every epoch, save the final checkpoint.
+    """Train for args.epochs epochs, log and save a checkpoint every epoch.
 
-    Writes results/<run>.csv every epoch and checkpoints/<run>.pt at the end.
+    Writes results/<run>.csv and checkpoints/<run>.pt after every epoch. If that
+    checkpoint already exists from an interrupted run (fewer than args.epochs
+    epochs, with optimiser and scheduler state), training resumes after its
+    last epoch; if it is already complete, nothing is trained.
 
     Args:
         model (nn.Module): Network to train, already on device.
@@ -130,8 +133,25 @@ def fit(model, train_loader, val_loader, test_loader, args, device):
     run = f"{args.arch}_clean_seed{args.seed}"
     os.makedirs("results", exist_ok=True)
     os.makedirs("checkpoints", exist_ok=True)
-    log, start = [], time.time()
-    for epoch in range(1, args.epochs + 1):
+    path, log_path = checkpoint_path(args.arch, args.seed), f"results/{run}.csv"
+    log, first = [], 1
+    if os.path.exists(path):
+        ckpt = torch.load(path, map_location=device)
+        done = ckpt.get("epoch", args.epochs)
+        if done >= args.epochs:
+            print(f"{path} already trained for {done} epochs; nothing to do")
+            model.load_state_dict(ckpt["model"])
+            return path
+        if "scheduler" in ckpt:
+            model.load_state_dict(ckpt["model"])
+            optimizer.load_state_dict(ckpt["optimizer"])
+            scheduler.load_state_dict(ckpt["scheduler"])
+            first = done + 1
+            if os.path.exists(log_path):
+                log = [r for r in load_rows(log_path) if r["epoch"] <= done]
+            print(f"resuming {path} after epoch {done}")
+    start = time.time() - (log[-1]["time"] if log else 0.0)
+    for epoch in range(first, args.epochs + 1):
         lr = optimizer.param_groups[0]["lr"]
         train_loss, grad_norm = train_one_epoch(model, train_loader, optimizer, device, scheduler)
         val_loss, val_acc = evaluate(model, val_loader, device)
@@ -142,6 +162,6 @@ def fit(model, train_loader, val_loader, test_loader, args, device):
             "lr": lr, "grad_norm": grad_norm, "time": time.time() - start,
         })
         print(", ".join(f"{k} {v:.4g}" for k, v in log[-1].items()), flush=True)
-        save_log(f"results/{run}.csv", log)
-        save_checkpoint(checkpoint_path(args.arch, args.seed), model, optimizer, epoch)
-    return checkpoint_path(args.arch, args.seed)
+        save_log(log_path, log)
+        save_checkpoint(path, model, optimizer, epoch, scheduler)
+    return path

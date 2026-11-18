@@ -56,7 +56,9 @@ python main.py --mode test
 ```
 
 Writes `checkpoints/resnet18_clean_seed0.pt` and the training log
-`results/resnet18_clean_seed0.csv`. Every command below uses this checkpoint by default
+`results/resnet18_clean_seed0.csv` after every epoch; rerunning the same command after an
+interruption resumes from the last finished epoch (and does nothing once all epochs are
+done). Every command below uses this checkpoint by default
 (`--checkpoint` to change it).
 
 **2. Figure: Grad-CAM maps and masks for 5 test images (Part A, Task 1)**
