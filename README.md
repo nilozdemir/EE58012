@@ -104,6 +104,17 @@ python -m experiments.figures --figure learned_vs_gradcam --rho 0.25
 
 → `results/fig_learned_vs_gradcam.png`
 
+**5. Report**
+
+```bash
+cd report && latexmk -pdf report.tex
+```
+
+→ `report/report.pdf`; it reads the figures from `results/`. The numbers in its
+tables are those of `results/asr.md`, `results/asr_cam_*.md` and
+`results/asr_steps200.md`.
+
+
 ## Method summary
 
 * **Threat model**: x' = x + m ⊙ δ, m ∈ {0,1}^{32×32} shared by the 3 channels,
@@ -125,13 +136,3 @@ python -m experiments.figures --figure learned_vs_gradcam --rho 0.25
   δ updated on all pixels by PGD. After 100 joint steps the final binary mask TopK(s, k)
   is fixed and δ is finished with the same 100-step PGD as Part A. The scores start from
   the Grad-CAM map or from uniform noise (`learned_gradcam` / `learned_random`).
-
-**5. Report**
-
-```bash
-cd report && latexmk -pdf report.tex
-```
-
-→ `report/report.pdf`; it reads the figures from `results/`. The numbers in its
-tables are those of `results/asr.md`, `results/asr_cam_*.md` and
-`results/asr_steps200.md`.
