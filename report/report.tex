@@ -75,9 +75,11 @@ while the features are still high-level enough to be class-specific.
 
 \textbf{Map.} For a score $S(\x)$ (a logit or a difference of logits, never a
 softmax probability), Grad-CAM gives
-$L_S=\sum_c\alpha_c A^c$ with $\alpha_c=\frac{1}{64}\sum_{ij}\partial S/\partial A^c_{ij}$,
-where $A$ is the output of \texttt{layer3}. The map is bilinearly upsampled to
-$32\times32$.
+$L_S=\sum_{f=1}^{256}\alpha_f A^f$ with
+$\alpha_f=\frac{1}{64}\sum_{i,j}\partial S/\partial A^f_{ij}$, where $A^f$ is the
+$f$-th of the 256 feature maps ($8\times8$) output by \texttt{layer3}, $(i,j)$ runs
+over its 64 cells, and the weight $\alpha_f$ measures how much feature map $f$
+supports the score $S$. The map is bilinearly upsampled to $32\times32$.
 
 \textbf{From map to mask.} The mask is the top-$k$ of the upsampled map. We rank the
 map \emph{before} the ReLU of Grad-CAM: the ReLU does not change the order of the
@@ -200,7 +202,8 @@ $\times2$ for the untargeted attack (30.6 $\to$ 58.8\% with Grad-CAM, 24.6 $\to$
 57.3\% random) and about $\times4$ for the targeted one (6.3 $\to$ 25.2\%, 6.2
 $\to$ 27.0\%). With $\varepsilon=2/255$ the attack is very weak per pixel, so its
 strength grows with the number of perturbed pixels: to first order the change of
-the loss is bounded by $\varepsilon\sum_{ij}m_{ij}\sum_c|\partial L/\partial x_{cij}|$,
+the loss is bounded by $\varepsilon\sum_{i,j}m_{ij}\sum_{c}|\partial L/\partial x_{cij}|$
+(with $c\in\{\mathrm{R},\mathrm{G},\mathrm{B}\}$ the colour channel),
 which roughly doubles with $k$. The targeted attack needs a larger change (it must
 reach one specific class), so it benefits more. At the same time the advantage of
 Grad-CAM over random shrinks (6.0 $\to$ 1.5\,pp untargeted): with half of the
@@ -221,10 +224,11 @@ with a straight-through estimator that treats $\m$ as if it were $\mathbf{s}$ in
 backward pass:
 \[
 \frac{\partial L}{\partial s_{ij}} := \frac{\partial L}{\partial m_{ij}}
-= \sum_{c}\delta_{cij}\,\frac{\partial L}{\partial x'_{cij}},
+= \sum_{c\in\{\mathrm{R},\mathrm{G},\mathrm{B}\}}\delta_{cij}\,\frac{\partial L}{\partial x'_{cij}},
 \]
-the first-order change of the attack objective $L$ when pixel $(i,j)$ is switched
-on with its current perturbation. To make this signal meaningful for pixels that are
+where $c$ is the colour channel (the sum appears because the mask is shared by the
+three channels). This is the first-order change of the attack objective $L$ when
+pixel $(i,j)$ is switched on with its current perturbation. To make this signal meaningful for pixels that are
 currently off, $\dd$ is kept on \emph{all} pixels and updated with the unmasked
 gradient at $\x'$, so a pixel that enters the mask brings the perturbation it would
 have had. Per batch of images:
