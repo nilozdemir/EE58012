@@ -42,8 +42,9 @@ after $\x'$ is formed. It was trained with SGD (momentum 0.9, lr 0.1, cosine
 schedule with one warm-up epoch, weight decay $5\cdot10^{-4}$, batch 128, random
 crop and flip) for 100 epochs and reaches \textbf{94.82\%} clean test accuracy.
 All 9{,}482 correctly classified test images are attacked; ASRs are fractions of
-these images. With $n=9482$ the standard error of an ASR is at most 0.5
-percentage points (pp).
+these images. With $n=9482$ the standard error of an ASR,
+$\sqrt{p(1-p)/n}$, is at most about 0.5 percentage points (pp; reached at an ASR of
+50\%), so differences below about 1\,pp are not significant.
 
 \textbf{Threat model.} $\x'=\x+\m\odot\dd$, with $\m\in\{0,1\}^{32\times32}$ shared
 by the three channels, exactly $k=\rho\cdot1024$ ones ($k=256$ and $512$),
