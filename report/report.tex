@@ -10,6 +10,8 @@
 \usepackage{caption}
 \usepackage[hidelinks]{hyperref}
 \usepackage{enumitem}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
 \setlist{nosep,leftmargin=*}
 \captionsetup{font=small,labelfont=bf}
 \setlength{\parskip}{3pt}
@@ -231,19 +233,47 @@ three channels). This is the first-order change of the attack objective $L$ when
 pixel $(i,j)$ is switched on with its current perturbation. To make this signal meaningful for pixels that are
 currently off, $\dd$ is kept on \emph{all} pixels and updated with the unmasked
 gradient at $\x'$, so a pixel that enters the mask brings the perturbation it would
-have had. Per batch of images:
-\begin{enumerate}
-\item Initialise $\mathbf{s}$ from the Grad-CAM map of Part A (standardised to zero
-mean and unit variance per image) or from i.i.d.\ uniform noise (also standardised);
-$\dd\sim U[-\varepsilon,\varepsilon]$.
-\item Repeat 100 times: $\m=\mathrm{TopK}(\mathbf{s},k)$, $\x'=\x+\m\odot\dd$,
-$\mathbf{g}=\nabla_{\x'}L$;\;
-$\dd\leftarrow\Pi(\dd+\alpha\,\mathrm{sign}(\mathbf{g}))$ on all pixels;\;
-one Adam step (lr 0.05) on $\mathbf{s}$ in the direction that increases $L$.
-\item Fix the final binary mask $\m=\mathrm{TopK}(\mathbf{s},k)$ and finish $\dd$ with
-the same 100-step PGD as Part A, starting from the current $\dd$.
-\end{enumerate}
-An image is a success if any iterate of step 2 or 3 succeeds; the returned example,
+have had. Algorithm~\ref{alg:learn} gives the full procedure for one image (in
+the code it runs on a batch, with each image independent).
+
+\begin{algorithm}[t]
+\caption{Learned sparse mask (Part B), for one image}
+\label{alg:learn}
+\begin{algorithmic}[1]
+\Require image $\x\in[0,1]^{3\times32\times32}$, label $y$, budget $k$, $\varepsilon=2/255$,
+  step $\alpha=2.5\varepsilon/100$, initial scores $\mathbf{s}_0\in\mathbb{R}^{32\times32}$
+  (Grad-CAM map or uniform noise), $T_m=100$ joint steps, $T=100$ PGD steps, Adam lr $\eta=0.05$
+\State $L(\x')\gets \mathrm{CE}(f(\x'),y)$ (untargeted) \textbf{or} $-\mathrm{CE}(f(\x'),t)$,
+  $t=(y+1)\bmod 10$ (targeted) \Comment{objective to maximise}
+\State $\mathbf{s}\gets(\mathbf{s}_0-\mathrm{mean}(\mathbf{s}_0))/\mathrm{std}(\mathbf{s}_0)$
+  \Comment{same scale for both inits}
+\State $\dd\gets\Pi(\mathbf{u})$, $\mathbf{u}\sim U[-\varepsilon,\varepsilon]^{3\times32\times32}$
+  \Comment{$\Pi$: clip to $[-\varepsilon,\varepsilon]$ and to $\x+\dd\in[0,1]$}
+\State $\mathit{found}\gets$ \textbf{none}
+\For{$\tau=1,\dots,T_m$} \Comment{stage 1: learn mask and $\dd$ jointly}
+  \State $\m\gets\mathrm{TopK}(\mathbf{s},k)$ \Comment{binary, exactly $k$ ones}
+  \State $\x'\gets\x+\m\odot\dd$
+  \State \textbf{if} $\x'$ succeeds \textbf{and} $\mathit{found}=$ \textbf{none} \textbf{then} $\mathit{found}\gets(\x',\m)$
+  \State $\mathbf{g}\gets\nabla_{\x'}L(\x')$
+  \State $\dd\gets\Pi(\dd+\alpha\,\mathrm{sign}(\mathbf{g}))$ \Comment{all pixels, not only masked ones}
+  \State $h_{ij}\gets\sum_{c}\delta_{cij}\,g_{cij}$ for every pixel $(i,j)$
+    \Comment{straight-through $\partial L/\partial s_{ij}$}
+  \State $\mathbf{s}\gets\mathrm{AdamStep}(\mathbf{s};\ \text{gradient } {-\mathbf{h}},\ \eta)$
+    \Comment{ascent on $L$}
+\EndFor
+\State $\m\gets\mathrm{TopK}(\mathbf{s},k)$ \Comment{final binary mask, fixed from here on}
+\For{$\tau=1,\dots,T$} \Comment{stage 2: PGD of Part A, warm start}
+  \State $\x'\gets\x+\m\odot\dd$
+  \State \textbf{if} $\x'$ succeeds \textbf{and} $\mathit{found}=$ \textbf{none} \textbf{then} $\mathit{found}\gets(\x',\m)$
+  \State $\dd\gets\Pi(\dd+\alpha\,\mathrm{sign}(\nabla_{\dd}L(\x+\m\odot\dd)))$
+\EndFor
+\State \textbf{if} $\x+\m\odot\dd$ succeeds \textbf{and} $\mathit{found}=$ \textbf{none} \textbf{then} $\mathit{found}\gets(\x+\m\odot\dd,\m)$
+\State \Return $\mathit{found}$ if it is not \textbf{none}, else $(\x+\m\odot\dd,\ \m)$ (failure)
+\end{algorithmic}
+\end{algorithm}
+
+Every candidate $\x'$ in Algorithm~\ref{alg:learn} uses a binary mask with exactly
+$k$ pixels, so an image is a success if any iterate of either stage succeeds; the returned example,
 its mask and the reported ASR use only binary masks with $k$ pixels. The two
 initialisations use identical settings (same $\alpha$, steps, learning rate and
 seed). Because the learned mask uses 100 joint steps on top of the 100 PGD steps of
